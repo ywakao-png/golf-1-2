@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AIアドバイス (キャッシュ最適化版)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        :root {
+            --bg: #2d2d2d;
+            --header-bg: #3d3d3d;
+            --nav-bg: #3d3d3d;
+            --nav-active: #999999;
+            --input-bg: #555555;
+            --text: #ffffff;
+            --text-muted: #cccccc;
+            --border: #555555;
+            --primary: #666666;
+            --danger: #dc3545;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding-bottom: 72px;
+        }
+
+        /* Header & Nav */
+        .header {
+            background: var(--header-bg);
+            color: white;
+            padding: 16px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--nav-bg);
+            border-top: 1px solid var(--border);
+            display: flex;
+            z-index: 100;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .nav-item {
+            flex: 1;
+            padding: 16px 6px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--text-muted);
+            border: none;
+            background: none;
+            font-family: inherit;
+        }
+        .nav-item.active {
+            background: var(--nav-active);
+            color: white;
+            font-weight: bold;
+        }
+
+        /* Pages */
+        .page {
+            display: none;
+            padding: 20px;
+        }
+        .page.active {
+            display: block;
+        }
+
+        /* メイン画面のレイアウト */
+        .instruction-text {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 24px;
+        }
+        .setting-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .setting-row.align-top {
+            align-items: flex-start;
+        }
+        .setting-label {
+            width: 100px;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        .setting-input {
+            flex: 1;
+            height: 44px;
+            background: var(--input-bg);
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            cursor: pointer;
+            font-size: 14px;
+            border: 1px solid var(--border);
+        }
+        .setting-input:active {
+            opacity: 0.7;
+        }
+        .club-type-box {
+            width: 44px;
+            height: 44px;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            margin-right: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+        textarea.data-textarea {
+            flex: 1;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            color: white;
+            padding: 10px;
+            font-size: 14px;
+            resize: vertical;
+            font-family: inherit;
+            outline: none;
+        }
+
+        /* Disclaimer & Buttons */
+        .btn-check {
+            background: var(--input-bg);
+            color: white;
+            border: 1px solid var(--border);
+            padding: 8px 12px;
+            font-size: 11px;
+            cursor: pointer;
+            text-align: center;
+            line-height: 1.4;
+        }
+        .btn-check:active { opacity: 0.7; }
+        
+        .disclaimer {
+            font-size: 16px;
+            line-height: 1.5;
+            color: var(--text-muted);
+            margin: 20px 0;
+        }
+
+        .btn-start {
+            background: var(--input-bg);
+            color: white;
+            border: 1px solid var(--border);
+            padding: 14px;
+            font-size: 18px;
+            font-weight: bold;
+            width: 100%;
+            cursor: pointer;
+            display: block;
+            margin: 0 auto;
+        }
+        .btn-start:active { opacity: 0.7; }
+
+        /* アドバイス結果エリア */
+        .result-container {
+            margin-top: 30px;
+            padding-top: 20px;
+            position: relative;
+            display: none;
+        }
+        .curve-line {
+            height: 30px;
+            border-top: 1px solid white;
+            border-radius: 50%;
+            margin-bottom: 10px;
+        }
+        .advice-content {
+            font-size: 14px;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            word-break: break-word;
+            min-height: 20px; /* ロード中は小さくてもOK */
+            margin-bottom: 20px;
+        }
+        .btn-copy {
+            background: var(--input-bg);
+            color: white;
+            border: 1px solid var(--border);
+            padding: 14px;
+            font-size: 16px;
+            font-weight: bold;
+            width: 100%;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        .btn-diagnosis-show {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--text-muted);
+            padding: 8px 16px;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 20px;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+
+        /* Settings & API */
+        .card {
+            background: var(--header-bg);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 14px;
+        }
+        .card-title {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        label { display: block; font-size: 12px; color: var(--text-muted); margin-top: 12px; margin-bottom: 4px; }
+        label:first-child { margin-top: 0; }
+        input[type="text"], input[type="number"], input[type="password"], select, textarea {
+            width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 4px;
+            font-size: 14px; background: var(--input-bg); color: var(--text); font-family: inherit; outline:none;
+        }
+        select {
+            -webkit-appearance: none;
+        }
+        .btn {
+            padding: 10px 16px; border-radius: 4px; border: none; font-size: 14px; cursor: pointer; font-family: inherit;
+            display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-weight: 500; transition: opacity 0.15s;
+        }
+        .btn:active { opacity: 0.75; }
+        .btn-primary { background: var(--input-bg); color: white; border: 1px solid var(--border); }
+        .btn-secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+        .btn-danger { background: #842029; color: white; border: 1px solid #5c161d; }
+        .btn-sm { padding: 6px 10px; font-size: 12px; }
+        .btn-full { width: 100%; }
+        .btn-group { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .input-unit { display: flex; align-items: center; gap: 6px; }
+        .input-unit input { flex: 1; }
+        .unit { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+        .toggle-group { display: flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+        .toggle-opt { flex: 1; padding: 10px; text-align: center; cursor: pointer; font-size: 14px; background: var(--input-bg); border: none; color: var(--text-muted); font-family: inherit; }
+        .toggle-opt.active { background: var(--primary); color: white; }
+
+        .accordion { margin-bottom: 10px; border-radius: 4px; overflow: hidden; background: var(--header-bg); }
+        .acc-header { background: var(--header-bg); padding: 15px 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-size: 14px; font-weight: bold; border: none; width: 100%; text-align: left; font-family: inherit; color: var(--text); }
+        .acc-arrow { transition: transform 0.2s; display: inline-block; color: var(--text-muted); }
+        .acc-header.open .acc-arrow { transform: rotate(180deg); }
+        .acc-body { display: none; padding: 0 16px 16px; border-top: 1px solid var(--border); }
+        .acc-body.open { display: block; }
+        
+        .preset-item { display: flex; align-items: center; padding: 11px 12px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 8px; gap: 6px; background: var(--input-bg); cursor: pointer; }
+        .preset-item.selected { border-color: white; }
+        .preset-name { flex: 1; font-size: 14px; font-weight: 500; }
+        .preset-subtitle { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+        .default-badge, .active-badge { font-size: 10px; padding: 2px 7px; border-radius: 10px; white-space: nowrap; }
+        .default-badge { background: #444; color: white; border: 1px solid #777;}
+        .active-badge { background: white; color: black; }
+        .preset-mgmt-item { display: flex; align-items: center; padding: 11px 12px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 8px; gap: 6px; background: var(--input-bg); }
+
+        /* Modals */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; align-items: flex-end; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: var(--header-bg); border-radius: 16px 16px 0 0; width: 100%; max-height: 85vh; overflow-y: auto; padding: 20px; padding-bottom: calc(20px + env(safe-area-inset-bottom)); color: white; border-top: 1px solid var(--border); }
+        .modal-title { font-size: 16px; font-weight: bold; margin-bottom: 16px; text-align: center; }
+
+        /* Checklist Grid */
+        .checklist-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .check-item { font-size: 12px; padding: 8px; border-radius: 4px; background: var(--input-bg); border: 1px solid var(--border); color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+        .check-item.ok { border-color: #74c69d; color: white; }
+
+        .loading-box { text-align: center; padding: 40px; color: var(--text-muted); }
+        .spinner { display: inline-block; width: 30px; height: 30px; border: 3px solid var(--input-bg); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="header">AIアドバイス</div>
+
+<div id="page-main" class="page active">
+    
+    <div class="instruction-text">アドバイスを行いたい情報を設定してください。</div>
+
+    <div class="setting-row">
+        <div class="setting-label">クラブ</div>
+        <div class="club-type-box" id="main-club-type">---</div>
+        <div class="setting-input" onclick="openSelectModal('club')" id="main-club"></div>
+    </div>
+
+    <div class="setting-row">
+        <div class="setting-label">ボール</div>
+        <div class="setting-input" onclick="openSelectModal('ball')" id="main-ball"></div>
+    </div>
+
+    <div class="setting-row">
+        <div class="setting-label">プロフィール</div>
+        <div class="setting-input" onclick="openSelectModal('profile')" id="main-profile"></div>
+    </div>
+
+    <div class="setting-row">
+        <div class="setting-label">天気情報</div>
+        <div class="setting-input" onclick="openSelectModal('weather')" id="main-weather"></div>
+    </div>
+
+    <div class="setting-row align-top">
+        <div class="setting-label" style="padding-top: 10px;">データ</div>
+        <textarea id="golf-data" rows="6" class="data-textarea" placeholder=""></textarea>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
+        <button class="btn-check" onclick="openDataCheckModal()">データ項目<br>チェック</button>
+    </div>
+
+    <div class="disclaimer">
+        本アドバイスは測定データに基づく参考提案であり、必ずしも最適な結果を保証するものではありません。<br>
+        アドバイスは選択されたショットデータに基づいています。<br>
+        体格やスイング特性により効果には個人差があります。<br>
+        無理なスイング調整はケガの原因になるためご注意ください。
+    </div>
+
+    <button class="btn-start" onclick="generateAdvice()">アドバイス開始</button>
+
+    <div id="result-view" class="result-container">
+        <button class="btn-diagnosis-show" onclick="openDiagnosisModal()" id="btn-show-diagnosis">診断結果を見る</button>
+        <div class="curve-line"></div>
+        <div id="result-loading" class="loading-box" style="display:none;">
+            <div class="spinner"></div>
+            <p id="loading-status-text" style="margin-top:14px;font-size:14px;">AIが分析・生成中...</p>
+        </div>
+        <div id="advice-content" class="advice-content"></div>
+        <button class="btn-copy" onclick="copyAdvice(this)" id="btn-copy" style="display:none;">コピー</button>
+    </div>
+</div>
+
+<div id="page-settings" class="page">
+    <div class="card">
+        <div class="card-title">📤 設定の共有</div>
+        <p style="font-size:11px; color:var(--text-muted); margin-bottom:12px; line-height:1.5;">JSONを書き出して、他の人に設定のプリセットを共有できます。<br>※裏側の診断・アドバイスルールも含まれます。</p>
+        <div class="btn-group">
+            <button class="btn btn-primary" style="flex:1;" onclick="exportSettings()">📤 エクスポート</button>
+            <button class="btn btn-secondary" style="flex:1;" onclick="document.getElementById('import-file').click()">📥 インポート</button>
+        </div>
+        <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importSettings(event)">
+    </div>
+
+    <div class="accordion">
+        <button class="acc-header" onclick="toggleAcc(this)"><span>👤 プロフィール</span><span class="acc-arrow">▼</span></button>
+        <div class="acc-body"><div style="margin-top:14px;" id="mgmt-list-profile"></div><button class="btn btn-primary btn-full" style="margin-top:12px;" onclick="openAddModal('profile')">＋ 追加</button></div>
+    </div>
+    
+    <div class="accordion">
+        <button class="acc-header" onclick="toggleAcc(this)"><span>🏌️ クラブ</span><span class="acc-arrow">▼</span></button>
+        <div class="acc-body"><div style="margin-top:14px;" id="mgmt-list-club"></div><button class="btn btn-primary btn-full" style="margin-top:12px;" onclick="openAddModal('club')">＋ 追加</button></div>
+    </div>
+    
+    <div class="accordion">
+        <button class="acc-header" onclick="toggleAcc(this)"><span>⚪ ボール</span><span class="acc-arrow">▼</span></button>
+        <div class="acc-body"><div style="margin-top:14px;" id="mgmt-list-ball"></div><button class="btn btn-primary btn-full" style="margin-top:12px;" onclick="openAddModal('ball')">＋ 追加</button></div>
+    </div>
+    
+    <div class="accordion">
+        <button class="acc-header" onclick="toggleAcc(this)"><span>🌤️ 天気情報</span><span class="acc-arrow">▼</span></button>
+        <div class="acc-body"><div style="margin-top:14px;" id="mgmt-list-weather"></div><button class="btn btn-primary btn-full" style="margin-top:12px;" onclick="openAddModal('weather')">＋ 追加</button></div>
+    </div>
+</div>
+
+<div id="page-api" class="page">
+    <div class="card">
+        <div class="card-title">🔑 APIキー設定</div>
+        <label>OpenAI APIキー (GPT用)</label>
+        <input type="password" id="api-key" placeholder="sk-...">
+        <label style="margin-top: 16px;">Google Gemini APIキー (Gemini用)</label>
+        <input type="password" id="gemini-api-key" placeholder="AIza...">
+        <button class="btn btn-primary btn-full" style="margin-top:16px;" onclick="saveApiKey()">💾 保存</button>
+    </div>
+    
+    <div class="card">
+        <div class="card-title">⚙️ AIモデル設定</div>
+        <label>🔍 診断用モデル</label>
+        <select id="diag-model">
+            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+            <option value="gpt-5-nano">GPT-5 nano</option>
+            <option value="gpt-5-mini">GPT-5 mini</option>
+            <option value="gpt-5.4-mini">GPT-5.4 mini</option>
+            <option value="gpt-5">GPT-5</option>
+            <option value="gpt-4o-mini">GPT-4o mini</option>
+        </select>
+        <label>💡 アドバイス用モデル</label>
+        <select id="adv-model">
+            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+            <option value="gpt-5-mini">GPT-5 mini</option>
+            <option value="gpt-5-nano">GPT-5 nano</option>
+            <option value="gpt-5.4-mini">GPT-5.4 mini</option>
+            <option value="gpt-5">GPT-5</option>
+            <option value="gpt-4o">GPT-4o</option>
+        </select>
+        <button class="btn btn-primary btn-full" style="margin-top:16px;" onclick="saveModel()">💾 モデル設定を保存</button>
+    </div>
+</div>
+
+<nav class="bottom-nav">
+    <button class="nav-item active" onclick="showPage('main', this)">AIアドバイス</button>
+    <button class="nav-item" onclick="showPage('settings', this)">設定</button>
+    <button class="nav-item" onclick="showPage('api', this)">API</button>
+</nav>
+
+<div id="select-modal" class="modal-overlay" onclick="closeSelectModal(event)">
+    <div class="modal">
+        <div class="modal-title" id="select-modal-title">選択</div>
+        <div id="select-modal-list"></div>
+        <button class="btn btn-secondary btn-full" style="margin-top:16px;" onclick="closeSelectModal()">閉じる</button>
+    </div>
+</div>
+
+<div id="edit-modal" class="modal-overlay" onclick="closeEditModal(event)">
+    <div class="modal">
+        <div class="modal-title" id="edit-modal-title">追加</div>
+        <div id="edit-modal-form"></div>
+        <div class="btn-group" style="margin-top:16px;">
+            <button class="btn btn-secondary" style="flex:1;" onclick="closeEditModal()">キャンセル</button>
+            <button class="btn btn-primary" style="flex:1;" onclick="confirmEdit()">保存</button>
+        </div>
+    </div>
+</div>
+
+<div id="data-check-modal" class="modal-overlay" onclick="closeDataCheckModal(event)">
+    <div class="modal">
+        <div class="modal-title">データ項目チェック</div>
+        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px; text-align: center;">
+            入力されたデータ内に以下の項目が含まれているか確認します。<br>
+            <span id="check-count">0/16</span> 項目検知
+        </div>
+        <div id="checklist" class="checklist-grid"></div>
+        <button class="btn btn-secondary btn-full" style="margin-top:20px;" onclick="closeDataCheckModal()">閉じる</button>
+    </div>
+</div>
+
+<div id="diagnosis-modal" class="modal-overlay" onclick="closeDiagnosisModal(event)">
+    <div class="modal">
+        <div class="modal-title">🔍 診断結果</div>
+        <div id="diagnosis-content" style="font-size: 14px; line-height: 1.8; white-space: pre-wrap; color: #ccc;"></div>
+        <button class="btn btn-secondary btn-full" style="margin-top:20px;" onclick="closeDiagnosisModal()">閉じる</button>
+    </div>
+</div>
+
+<script>
+// ============================================================================
+// 💡 AIへの指示（ハードコード領域）
+// ============================================================================
+
+const DIAGNOSIS_SHARED_RULE = `あなたはゴルフ弾道データ分析AIです。
+入力されたショットデータを分析し、飛距離ロスと方向性低下の原因を優先順に最大4つ診断してください。
+【共通ルール】
+- 必ず入力された数値のみを根拠に判断
+- 診断は問題の明確化に徹し、推測・一般論・改善提案は禁止
+- 必ず「主」「補」を確認する
+- 主は問題の発生条件（必須条件）、補は問題が本当に起きているかを確認する条件
+- 主のみでは診断しない
+- 補が1つ以上確認できる場合のみ診断
+- 診断名は共通診断ルールのタイトルから選ぶ（例：スピン過多）
+- 同一現象の重複出力は禁止
+- 原因と結果が重なる場合は根本原因を優先
+- 明確な原因が4つ未満の場合は無理に出さない
+- 総飛距離 / キャリー / ラン / 高さ / 左右ブレ幅は[yds],ボールスピード / クラブスピードは[m/s],滞空時間は[s],AOA / スピンロフト / スピン軸 / 打ち出し方向 / 打ち出し角は[°],スピン量は[rpm]を使用
+- 目標には、その診断の主条件に対応する基準レンジを記載し、補助条件は含めない
+- 目標は単一値ではなくレンジで記載する
+【共通優先順位】
+- AOA過多 ＞ スピンロフト過多 ＞ スピン過多/不足 ＞ 打ち出し角過多/不足 ＞ ミート率低下 ＞ 方向性系
+- 左右ブレ幅過多と左打ち出し/右打ち出しが重なる場合は主因を優先
+- スピン過多とAOA過多またはスピンロフト過多が重なる場合は上流原因を優先
+【共通診断ルール】
+▼ スピン過多
+主：スピン量＞上限
+補：打ち出し角＞上限 / 高さ高 / ラン少 / 滞空時間長
+▼ スピン不足
+主：スピン量＜下限
+補：高さ低 / キャリー不足 / 滞空時間短 / ラン多
+▼ 打ち出し角過多
+主：打ち出し角＞上限
+補：高さ高 / スピン量多 / 滞空時間長 / ラン少
+▼ 打ち出し角不足
+主：打ち出し角＜下限
+補：高さ低 / キャリー不足 / 滞空時間短 / 初速比不足
+▼ AOA過多
+主：AOA＜下限
+補：スピン量多 / 打ち出し角異常 / ラン少 / キャリー効率低
+▼ AOA不足
+主：AOA＞理想未満
+補：打ち出し角不足 / 高さ不足 / スピン不足 / キャリー不足
+▼ ミート率低下
+主：ミート率＜基準未満
+補：ボールスピード＞期待値90%未満 / キャリー不足 / 総飛距離不足
+▼ スピンロフト過多
+主：スピンロフト＞基準超
+補：スピン量多 / 打ち出し角＞上限 / 高さ高 / ラン少
+▼ 左打ち出し
+主：打ち出し方向＜0
+補：左ブレ / スピン軸＜0 / 左系
+▼ 右打ち出し
+主：打ち出し方向＞0
+補：右ブレ / スピン軸＞0 / 右系
+▼ 左右ブレ幅過多
+主：左右ブレ幅大
+補：打ち出し方向不安定 / スピン軸大 / ショットタイプばらつき
+▼ スピン軸過多
+主：スピン軸大
+補：左右ブレ幅大 / 曲がり傾向が明確 / 打ち出し方向のズレ大
+【出力形式】
+- 1. 項目名：値
+- 捕捉（補の内容が入る）：データ名 値
+- 目標：データ名 値
+【出力例】
+1. スピン過多：7000rpm
+捕捉：打ち出し角25° / 高さ34yds
+目標：スピン量2200〜3000rpm`;
+
+const DIAGNOSIS_CLUB_RULES = {
+    "ドライバー": `【ドライバー基準レンジ】
+- クラブスピード区分：30以上35未満=低速、35以上40未満=中速、40以上46以下=高速
+- スピン量：低速2500〜3200 / 中速2200〜3000 / 高速1800〜2600
+- 打ち出し角：低速12〜16 / 中速11〜15 / 高速10〜14
+- ミート率：1.45以上理想、1.40以上1.45未満許容、1.40未満問題候補
+- AOA：+2〜+5理想、0〜+2やや不足、-2〜0不足、-2未満過多
+- 高さ：20〜35理想、35超40未満やや高い、40以上高い、15以上20未満やや低い、15未満低い
+- ボールスピード期待値：クラブスピード×1.45
+- スピンロフト：15.6前後中心、18超やや過多候補、20超過多候補`,
+    "フェアウェイウッド": `【フェアウェイウッド基準レンジ】
+- クラブスピード区分：28以上33未満=低速、33以上38未満=中速、38以上43以下=高速
+- スピン量：低速3200〜4200 / 中速3000〜4000 / 高速2800〜3800
+- 打ち出し角：低速11〜15 / 中速10〜14 / 高速9〜13
+- ミート率：1.43以上理想、1.38以上1.43未満許容、1.38未満問題候補
+- AOA：-3〜0理想、0超やや不足、-5未満過多
+- 高さ：18〜32理想、32超高い、15未満低い
+- ボールスピード期待値：クラブスピード×1.43
+- スピンロフト：17前後中心、20超やや過多候補、22超過多候補`,
+    "ユーティリティ": `【ユーティリティ基準レンジ】
+- クラブスピード区分：26以上31未満=低速、31以上36未満=中速、36以上41以下=高速
+- スピン量：低速3400〜4600 / 中速3200〜4400 / 高速3000〜4200
+- 打ち出し角：低速13〜18 / 中速12〜17 / 高速11〜16
+- ミート率：1.42以上理想、1.36以上1.42未満許容、1.36未満問題候補
+- AOA：-4〜-1理想、0超やや不足、-6未満過多
+- 高さ：20〜34理想、34超高い、16未満低い
+- ボールスピード期待値：クラブスピード×1.42
+- スピンロフト：19前後中心、22超やや過多候補、24超過多候補`,
+    "アイアン": `【アイアン基準レンジ】
+- クラブスピード区分：24以上29未満=低速、29以上34未満=中速、34以上39以下=高速
+- スピン量：低速4500〜6500 / 中速5000〜7000 / 高速5500〜7500
+- 打ち出し角：低速16〜22 / 中速15〜21 / 高速14〜20
+- ミート率：1.38以上理想、1.32以上1.38未満許容、1.32未満問題候補
+- AOA：-5〜-2理想、-2超やや不足、-7未満過多
+- 高さ：22〜36理想、36超高い、18未満低い
+- ボールスピード期待値：クラブスピード×1.38
+- スピンロフト：24前後中心、28超やや過多候補、30超過多候補`,
+    "ウェッジ": `【ウェッジ基準レンジ】
+- クラブスピード区分：18以上23未満=低速、23以上28未満=中速、28以上33以下=高速
+- スピン量：低速5000〜7500 / 中速6000〜8500 / 高速7000〜9500
+- 打ち出し角：低速24〜32 / 中速22〜30 / 高速20〜28
+- ミート率：1.25以上理想、1.20以上1.25未満許容、1.20未満問題候補
+- AOA：-6〜-3理想、-3超やや不足、-8未満過多
+- 高さ：20〜32理想、32超高い、16未満低い
+- ボールスピード期待値：クラブスピード×1.25
+- スピンロフト：30前後中心、34超やや過多候補、36超過多候補`,
+    "その他": `【その他基準レンジ】
+- 特定クラブの理想レンジは直接適用しない
+- クラブスピード、ボールスピード、打ち出し角、スピン量、ミート率、左右ブレ幅、スピン軸の関係性を優先して判断
+- ボールスピード期待値はクラブスピード×1.35〜1.45の範囲を目安にする
+- AOA、スピンロフトは極端な値のみ候補化する`
+};
+
+const ADVICE_SHARED_RULE = `あなたはゴルフ改善アドバイスAIです。
+入力された問題点に対して、一般ゴルファーが実行できる改善方法を作成してください。
+【共通ルール】
+- 各問題点は、実行可能な改善方法を1行で出力
+- 1行は簡潔にし、90文字以内で作成
+- 必ず「何をするか」と「何が改善されるか」を含める
+- 抽象表現、精神論、原因分析、数値の再説明は禁止
+- 入力にない新たな問題点を追加しない
+- 同じ内容の繰り返しは禁止
+- クラブ特性を考慮し、クラブに合わないアドバイスは禁止
+- 危険な矯正、極端なフォーム変更、医学的助言は禁止
+【作成原則】
+- 動作は、セットアップ、ボール位置、フェース向き、振り方、力感、テンポ、体の使い方のいずれかに落とし込む
+- 改善結果は、飛距離、キャリー、高さ、スピン量、方向性、左右ブレ、ミート率、初速のいずれかに結びつける
+- 問題点ごとに単独で読んで意味が通る内容にする
+- 丁寧で敬語を使用した自然な日本語
+【問題点ごとの改善方針】
+▼ スピン過多
+- 余計に球を上げにいかず、ロフトを増やしすぎない当て方を優先
+- 弾道を抑え、前に進む距離を増やす方向で書く
+- ドライバーでは吹け上がり抑制を優先
+- ウェッジでは必要スピンを消しすぎないように、極端な低スピン化は避ける
+▼ スピン不足
+- フェースに乗せる感覚、適正な高さ、適正な入射を作る方向で書く
+- キャリー不足や止まりにくさの改善につなげる
+- ウェッジ・アイアンでは止まりやすさも結果に含めてよい
+▼ 打ち出し角過多
+- すくい打ち、上げにいく動き、過度な上向き動作を抑える方向で書く
+- 高さの出すぎ、飛距離効率低下の改善につなげる
+- ドライバーでは吹け上がり抑制を優先する
+▼ 打ち出し角不足
+- ボール位置、入射、振り抜きで高さを出す方向で書く
+- キャリーや高さの改善につなげる
+- フェアウェイウッド・ユーティリティでは球の上がりやすさを重視する
+▼ AOA過多
+- 上から打ち込みすぎない動きに修正する
+- ドライバーでは入射角改善、スピン抑制、飛距離効率改善につなげる
+- アイアンやウェッジで不自然なアッパー助言はしない
+- 対象クラブに不適切な場合は、無理にAOA用語を出さず、当て方の修正として自然に表現する
+▼ AOA不足
+- 適正な入射を作る方向で書く
+- 高さ不足、打ち出し不足、キャリー不足の改善につなげる
+- ドライバーでは適正な上向き要素、アイアンでは適正なコンタクト重視で表現する
+- クラブに応じて内容を自然に変える
+▼ ミート率低下
+- 芯に当てやすくする動き、力感、テンポ、振り幅を優先する
+- 初速、飛距離、距離の安定改善につなげる
+- 全クラブ共通で使えるが、ウェッジは距離感安定、ドライバーは初速改善寄りに書く
+▼ スピンロフト過多
+- ロフトを増やしすぎない当て方、ハンドファースト寄りの整理、当たり方の改善で書く
+- 余分なスピン抑制と飛距離効率改善につなげる
+- ウェッジではスピンをゼロにする方向ではなく、過剰を抑える表現にする
+▼ 左打ち出し
+- 構え、フェース向き、出球方向を整える内容にする
+- 左へのスタート方向改善につなげる
+- 左右ブレ幅過多とは区別し、出球方向を直す内容に限定する
+▼ 右打ち出し
+- 構え、フェース向き、出球方向を整える内容にする
+- 右へのスタート方向改善につなげる
+- 左右ブレ幅過多とは区別し、出球方向を直す内容に限定する
+▼ 左右ブレ幅過多
+- テンポ、再現性、インパクト安定に寄せる
+- 着弾の散らばり縮小につなげる
+- 左右打ち出しとは区別し、ばらつきそのものを減らす内容にする
+▼ スピン軸過多
+- 手打ち抑制、体の回転、フェース管理で書く
+- 曲がり幅の縮小、方向性改善につなげる
+- 打ち出し方向そのものではなく、曲がり量を減らす内容にする
+【プロフィール反映ルール】
+- 性別や年齢によって診断名や問題点、分析結果を変更してはならない
+- 性別と年齢は改善方法の内容、優先の置き方、表現の強さのみ反映
+- 性別は、飛距離・高さ・安定性のどれを優先して改善するかの比重調整に使う
+- 年齢は、無理のない動作量、体への負担、再現しやすさを考慮して改善方法を調整する
+- 年齢が高い場合は、極端なフォーム変更よりも、セットアップ、テンポ、力感、ボール位置などの調整を優先する
+- 若年層には、体の使い方を含む改善提案をしてよい
+- 性別や年齢を理由に改善を弱めるのではなく、その人に合った実行しやすい改善に言い換える
+- 性別や年齢そのものの出力文明示禁止
+【出力形式】
+タイトル | 改善方法 + 改善される内容`;
+
+const ADVICE_CLUB_RULES = {
+    "ドライバー": `【クラブ特性（ドライバー）】
+- 飛距離効率（キャリー＋ラン）を最優先で考える
+- スピン量と打ち出し角のバランス改善を優先する
+- AOAは重要指標として扱う
+- ミート率と初速効率を重視する
+- 左右ブレとスピン軸の改善を重視する
+- ティーアップ前提のアドバイスを含めてよい`,
+    "フェアウェイウッド": `【クラブ特性（フェアウェイウッド）】
+- キャリー性能を最優先で考える
+- 打ち出し角と高さの確保を重視する
+- ミート率と初速効率を重視する
+- スピン量は球の上がりやすさに影響する前提で扱う
+- 方向性改善も評価対象とする
+- 地面から打つ前提のアドバイスを優先する`,
+    "ユーティリティ": `【クラブ特性（ユーティリティ）】
+- 高さとキャリーを最優先で考える
+- スピン量は球の浮きやすさに影響する前提で扱う
+- ミート率と初速効率を重視する
+- 方向性の安定を重視する
+- アイアンより払い打ち寄りのアドバイスを優先する`,
+    "アイアン": `【クラブ特性（アイアン）】
+- キャリーと距離の安定性を最優先で考える
+- 打ち出し方向を重視する
+- 高さとスピン量を評価する
+- ミート率と初速効率を重視する
+- ドライバー的なアッパー軌道の助言は禁止`,
+    "ウェッジ": `【クラブ特性（ウェッジ）】
+- キャリーの再現性を最優先で考える
+- スピン量を重要指標とする
+- 高さを評価する
+- 方向性の安定を重視する
+- 強振ではなく距離感を整える方向の助言を優先する`,
+    "その他": `【クラブ特性（その他）】
+- ミート率とボール初速の効率を重視する
+- 打ち出し方向と左右ブレを評価する
+- スピン量と打ち出し角のバランスを確認する
+- 極端なクラブ専用助言は避ける`
+};
+
+const CHECK_ITEMS = [
+    "総飛距離", "キャリー", "ラン", "ボールスピード",
+    "クラブスピード", "ミート率", "高さ", "滞空時間",
+    "打ち出し角", "AOA", "スピンロフト", "スピン量",
+    "スピン軸", "左右ブレ幅", "打ち出し方向", "ショットタイプ"
+];
+
+// クラブの略称マッピング
+const CLUB_TYPE_MAP = {
+    "ドライバー": "DR",
+    "フェアウェイウッド": "FW",
+    "ユーティリティ": "UT",
+    "アイアン": "I",
+    "ウェッジ": "WG",
+    "その他": "---" // 画像の仕様や好みで変えてOK
+};
+// ============================================================================
+
+
+// ==================== Storage ====================
+const S = {
+    get: k => { try { return JSON.parse(localStorage.getItem('ga_' + k)); } catch { return null; } },
+    set: (k, v) => localStorage.setItem('ga_' + k, JSON.stringify(v)),
+    presets: type => S.get('p_' + type) || [],
+    savePresets: (type, arr) => S.set('p_' + type, arr),
+    defId: type => S.get('d_' + type),
+    setDef: (type, id) => S.set('d_' + type, id),
+};
+
+// ==================== State ====================
+const TYPES = ['profile', 'club', 'ball', 'weather'];
+const selected = {};
+let selectModalType = null;
+let editModalType = null;
+let editModalId = null;
+let editGender = '男性';
+let currentDiagnosisText = "";
+
+// ==================== Nav & Accordion ====================
+function showPage(page, el) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('page-' + page).classList.add('active');
+    el.classList.add('active');
+    if (page === 'settings') renderAllMgmtLists();
+}
+
+function toggleAcc(btn) {
+    btn.classList.toggle('open');
+    btn.nextElementSibling.classList.toggle('open');
+}
+
+// ==================== Check Data Modal ====================
+function openDataCheckModal() {
+    const listEl = document.getElementById('checklist');
+    const text = document.getElementById('golf-data').value;
+    let foundCount = 0;
+    
+    listEl.innerHTML = CHECK_ITEMS.map(item => {
+        const isFound = text.includes(item);
+        if (isFound) foundCount++;
+        return `
+            <div class="check-item ${isFound ? 'ok' : ''}">
+                <span class="check-icon">${isFound ? '✅' : '➖'}</span> ${item}
+            </div>
+        `;
+    }).join('');
+    
+    document.getElementById('check-count').textContent = `${foundCount}/${CHECK_ITEMS.length}`;
+    document.getElementById('data-check-modal').classList.add('active');
+}
+
+function closeDataCheckModal(e) {
+    if (e && e.target !== document.getElementById('data-check-modal')) return;
+    document.getElementById('data-check-modal').classList.remove('active');
+}
+
+// ==================== Diagnosis Modal ====================
+function openDiagnosisModal() {
+    document.getElementById('diagnosis-content').textContent = currentDiagnosisText || "診断結果がありません。";
+    document.getElementById('diagnosis-modal').classList.add('active');
+}
+
+function closeDiagnosisModal(e) {
+    if (e && e.target !== document.getElementById('diagnosis-modal')) return;
+    document.getElementById('diagnosis-modal').classList.remove('active');
+}
+
+// ==================== Main: Select Modal ====================
+const SEL_LABELS = { profile: 'プロフィール', club: '使用クラブ', ball: '使用ボール', weather: '天気情報' };
+
+function openSelectModal(type) {
+    selectModalType = type;
+    document.getElementById('select-modal-title').textContent = SEL_LABELS[type] + ' を選択';
+    renderSelectList(type);
+    document.getElementById('select-modal').classList.add('active');
+}
+
+function closeSelectModal(e) {
+    if (e && e.target !== document.getElementById('select-modal')) return;
+    document.getElementById('select-modal').classList.remove('active');
+    selectModalType = null;
+}
+
+function renderSelectList(type) {
+    const presets = S.presets(type);
+    const defId = S.defId(type);
+    const cur = selected[type];
+    const el = document.getElementById('select-modal-list');
+
+    if (!presets.length) { 
+        el.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:24px 0;">プリセットがありません</p>'; 
+        return; 
+    }
+    
+    el.innerHTML = presets.map(p => {
+        const subtitle = type === 'club' && p.clubType ? `<div class="preset-subtitle">種類: ${p.clubType}</div>` : '';
+        return `
+            <div class="preset-item ${cur && cur.id === p.id ? 'selected' : ''}" onclick="selectPreset('${type}', ${p.id})">
+                <div style="flex:1">
+                    <div class="preset-name">${p.name}</div>
+                    ${subtitle}
+                </div>
+                ${cur && cur.id === p.id ? '<span class="active-badge">使用中</span>' : ''}
+                ${p.id === defId ? '<span class="default-badge">デフォルト</span>' : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+function selectPreset(type, id) {
+    const preset = S.presets(type).find(p => p.id === id);
+    if (!preset) return;
+    selected[type] = preset;
+    updateMainRow(type, preset.name, preset.clubType);
+    closeSelectModal();
+}
+
+function updateMainRow(type, name, clubType) {
+    const el = document.getElementById('main-' + type);
+    if (!el) return;
+    
+    if (name) { 
+        el.textContent = name; 
+    } else { 
+        el.textContent = ''; 
+    }
+
+    if (type === 'club') {
+        const typeBox = document.getElementById('main-club-type');
+        typeBox.textContent = clubType ? (CLUB_TYPE_MAP[clubType] || "---") : "---";
+    }
+}
+
+// ==================== Settings: Management ====================
+function renderAllMgmtLists() { TYPES.forEach(type => renderMgmtList(type)); }
+
+function renderMgmtList(type) {
+    const el = document.getElementById('mgmt-list-' + type);
+    if (!el) return;
+    const presets = S.presets(type);
+    const defId = S.defId(type);
+    
+    if (!presets.length) { el.innerHTML = '<p style="font-size:13px;color:var(--text-muted);text-align:center;padding:10px 0;">なし</p>'; return; }
+    
+    el.innerHTML = presets.map(p => {
+        const subtitle = type === 'club' && p.clubType ? `<div class="preset-subtitle">(${p.clubType})</div>` : '';
+        return `
+            <div class="preset-mgmt-item ${p.id === defId ? 'is-default' : ''}">
+                <div style="flex:1">
+                    <div class="preset-name">${p.name} ${p.id === defId ? '<span class="default-badge" style="margin-left:6px;">デフォルト</span>' : ''}</div>
+                    ${subtitle}
+                </div>
+                <button class="btn btn-secondary btn-sm" onclick="setDefault('${type}',${p.id})" title="デフォルトに設定">⭐</button>
+                <button class="btn btn-secondary btn-sm" onclick="openEditModal('${type}',${p.id})">✏️</button>
+                <button class="btn btn-danger btn-sm" onclick="deletePreset('${type}',${p.id})">🗑</button>
+            </div>
+        `;
+    }).join('');
+}
+
+function setDefault(type, id) {
+    S.setDef(type, id); renderMgmtList(type);
+    if (!selected[type]) {
+        const p = S.presets(type).find(x => x.id === id);
+        if (p) { selected[type] = p; updateMainRow(type, p.name, p.clubType); }
+    }
+}
+
+function deletePreset(type, id) {
+    if (!confirm('削除しますか？')) return;
+    S.savePresets(type, S.presets(type).filter(p => p.id !== id));
+    if (S.defId(type) === id) S.setDef(type, null);
+    if (selected[type]?.id === id) { selected[type] = null; updateMainRow(type, null, null); }
+    renderMgmtList(type);
+}
+
+// ==================== Settings: Add/Edit Modal ====================
+function openAddModal(type) {
+    editModalType = type; editModalId = null; editGender = '男性';
+    document.getElementById('edit-modal-title').textContent = SEL_LABELS[type] + ' を追加';
+    document.getElementById('edit-modal-form').innerHTML = buildEditForm(type, null);
+    document.getElementById('edit-modal').classList.add('active');
+}
+
+function openEditModal(type, id) {
+    editModalType = type; editModalId = id;
+    const preset = S.presets(type).find(p => p.id === id);
+    if (!preset) return;
+    editGender = preset.gender || '男性';
+    document.getElementById('edit-modal-title').textContent = SEL_LABELS[type] + ' を編集';
+    document.getElementById('edit-modal-form').innerHTML = buildEditForm(type, preset);
+    document.getElementById('edit-modal').classList.add('active');
+}
+
+function closeEditModal(e) {
+    if (e && e.target !== document.getElementById('edit-modal')) return;
+    document.getElementById('edit-modal').classList.remove('active');
+}
+
+function buildEditForm(type, preset) {
+    const v = (field, def = '') => preset ? (preset[field] ?? def) : def;
+    
+    if (type === 'profile') {
+        return `
+            <label>名前</label><input type="text" id="ef-name" value="${v('name')}">
+            <label>性別</label>
+            <div class="toggle-group">
+                <button class="toggle-opt ${editGender === '男性' ? 'active' : ''}" onclick="setEditGender('男性',this)">男性</button>
+                <button class="toggle-opt ${editGender === '女性' ? 'active' : ''}" onclick="setEditGender('女性',this)">女性</button>
+            </div>
+            <div class="grid-2">
+                <div><label>年齢</label><div class="input-unit"><input type="number" id="ef-age" value="${v('age')}"><span class="unit">歳</span></div></div>
+                <div><label>身長</label><div class="input-unit"><input type="number" id="ef-height" value="${v('height')}"><span class="unit">cm</span></div></div>
+            </div>
+            <label>体重</label><div class="input-unit" style="max-width:160px;"><input type="number" id="ef-weight" value="${v('weight')}"><span class="unit">kg</span></div>
+        `;
+    }
+    if (type === 'club') {
+        return `
+            <label>クラブ名</label><input type="text" id="ef-name" value="${v('name')}" placeholder="例：TaylorMade Stealth 2">
+            <label>クラブの種類</label>
+            <select id="ef-club-type">
+                <option value="ドライバー" ${v('clubType') === 'ドライバー' ? 'selected' : ''}>ドライバー</option>
+                <option value="フェアウェイウッド" ${v('clubType') === 'フェアウェイウッド' ? 'selected' : ''}>フェアウェイウッド</option>
+                <option value="ユーティリティ" ${v('clubType') === 'ユーティリティ' ? 'selected' : ''}>ユーティリティ</option>
+                <option value="アイアン" ${v('clubType') === 'アイアン' ? 'selected' : ''}>アイアン</option>
+                <option value="ウェッジ" ${v('clubType') === 'ウェッジ' ? 'selected' : ''}>ウェッジ</option>
+                <option value="パター" ${v('clubType') === 'パター' ? 'selected' : ''}>パター</option>
+            </select>
+        `;
+    }
+    if (type === 'ball') {
+        return `<label>ボール名</label><input type="text" id="ef-name" value="${v('name')}">`;
+    }
+    if (type === 'weather') {
+        return `
+            <label>プリセット名</label><input type="text" id="ef-name" value="${v('name')}">
+            <label>地面の硬さ</label><input type="text" id="ef-ground" value="${v('ground')}">
+            <div class="grid-2">
+                <div><label>温度</label><div class="input-unit"><input type="number" id="ef-temp" value="${v('temp')}"><span class="unit">°C</span></div></div>
+                <div><label>湿度</label><div class="input-unit"><input type="number" id="ef-humidity" value="${v('humidity')}"><span class="unit">%</span></div></div>
+                <div><label>気圧</label><div class="input-unit"><input type="number" id="ef-pressure" value="${v('pressure')}"><span class="unit">hPa</span></div></div>
+                <div><label>風速</label><div class="input-unit"><input type="number" id="ef-windspd" value="${v('windspd')}"><span class="unit">m/s</span></div></div>
+            </div>
+            <label>風向き</label><div class="input-unit"><input type="number" id="ef-winddir" value="${v('winddir')}"><span class="unit">°</span></div>
+        `;
+    }
+}
+
+function setEditGender(g, btn) {
+    editGender = g;
+    btn.closest('.toggle-group').querySelectorAll('.toggle-opt').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+}
+
+function confirmEdit() {
+    const name = document.getElementById('ef-name')?.value.trim();
+    if (!name) { alert('名前を入力してください'); return; }
+
+    const gv = id => document.getElementById(id)?.value || '';
+    let data = { name };
+    
+    if (editModalType === 'profile') {
+        data.gender = editGender; data.age = gv('ef-age'); data.height = gv('ef-height'); data.weight = gv('ef-weight');
+    } else if (editModalType === 'club') {
+        data.clubType = gv('ef-club-type');
+    } else if (editModalType === 'weather') {
+        data.ground = gv('ef-ground'); data.temp = gv('ef-temp'); data.humidity = gv('ef-humidity'); 
+        data.pressure = gv('ef-pressure'); data.windspd = gv('ef-windspd'); data.winddir = gv('ef-winddir');
+    }
+
+    const presets = S.presets(editModalType);
+    if (editModalId) {
+        const idx = presets.findIndex(p => p.id === editModalId);
+        if (idx >= 0) presets[idx] = { ...presets[idx], ...data };
+        if (selected[editModalType]?.id === editModalId) {
+            selected[editModalType] = presets[idx];
+            updateMainRow(editModalType, presets[idx].name, presets[idx].clubType);
+        }
+    } else {
+        data.id = Date.now(); presets.push(data);
+        if (presets.length === 1) S.setDef(editModalType, data.id);
+    }
+    S.savePresets(editModalType, presets);
+    renderMgmtList(editModalType);
+    closeEditModal();
+}
+
+// ==================== Export / Import ====================
+function exportSettings() {
+    const data = {}; TYPES.forEach(t => { data['p_' + t] = S.presets(t); data['d_' + t] = S.defId(t); });
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'golf_settings.json'; a.click();
+}
+function importSettings(event) {
+    const file = event.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        try {
+            const data = JSON.parse(e.target.result);
+            TYPES.forEach(t => { if (data['p_' + t]) S.savePresets(t, data['p_' + t]); if (data['d_' + t]) S.setDef(t, data['d_' + t]); });
+            loadDefaults(); renderAllMgmtLists(); alert('インポートしました！');
+        } catch { alert('エラーが発生しました。'); }
+    };
+    reader.readAsText(file);
+}
+
+// ==================== API Settings ====================
+function saveApiKey() { 
+    S.set('apikey', document.getElementById('api-key').value.trim()); 
+    S.set('gemini_apikey', document.getElementById('gemini-api-key').value.trim()); 
+    alert('APIキーを保存しました'); 
+}
+
+function saveModel() { 
+    S.set('diag_model', document.getElementById('diag-model').value);
+    S.set('adv_model', document.getElementById('adv-model').value);
+    alert('モデル設定を保存しました'); 
+}
+
+// ==================== Prompt Builders ====================
+function formatProfile() {
+    const p = selected['profile']; if (!p) return '';
+    let t = `[プロフィール]\n性別: ${p.gender}\n`;
+    if (p.age) t += `年齢: ${p.age}歳\n`; if (p.height) t += `身長: ${p.height}cm\n`; if (p.weight) t += `体重: ${p.weight}kg\n`;
+    return t + '\n';
+}
+
+function formatWeather() {
+    const w = selected['weather']; if (!w) return '';
+    const { ground, temp, humidity, pressure, windspd, winddir } = w;
+    if (!(ground || temp || humidity || pressure || windspd || winddir)) return '';
+    let t = `[天気環境]\n`;
+    if (ground) t += `地面: ${ground}\n`; if (temp) t += `温度: ${temp}°C\n`; if (humidity) t += `湿度: ${humidity}%\n`; 
+    if (pressure) t += `気圧: ${pressure}hPa\n`; if (windspd) t += `風速: ${windspd}m/s\n`; if (winddir) t += `風向: ${winddir}°\n`;
+    return t + '\n';
+}
+
+function buildDiagnosisPrompt() {
+    const selClub = selected['club'];
+    let p = "";
+    if (DIAGNOSIS_SHARED_RULE.trim()) p += `[共有ルール]\n${DIAGNOSIS_SHARED_RULE.trim()}\n\n`;
+    if (selClub && selClub.clubType && DIAGNOSIS_CLUB_RULES[selClub.clubType]?.trim()) {
+        p += `[クラブルール]\n${DIAGNOSIS_CLUB_RULES[selClub.clubType].trim()}\n\n`;
+    }
+    p += formatProfile();
+    if (selClub) p += `[使用クラブ]\n${selClub.name}\n\n`;
+    if (selected['ball']) p += `[使用ボール]\n${selected['ball'].name}\n\n`;
+    p += formatWeather();
+    p += `[ショットデータ]\n${document.getElementById('golf-data').value.trim()}\n`;
+    return p;
+}
+
+function buildAdvicePrompt(diagText) {
+    const selClub = selected['club'];
+    let p = "";
+    if (ADVICE_SHARED_RULE.trim()) p += `[共有ルール]\n${ADVICE_SHARED_RULE.trim()}\n\n`;
+    if (selClub && selClub.clubType && ADVICE_CLUB_RULES[selClub.clubType]?.trim()) {
+        p += `[クラブルール]\n${ADVICE_CLUB_RULES[selClub.clubType].trim()}\n\n`;
+    }
+    p += formatProfile();
+    p += formatWeather();
+    p += `[診断結果]\n${diagText}\n`;
+    return p;
+}
+
+// ==================== API Stream Logic ====================
+async function fetchAIStream(prompt, modelType, onChunk, onComplete) {
+    const model = S.get(modelType) || (modelType === 'diag_model' ? 'gemini-2.5-flash' : 'gpt-5-mini');
+    const isGemini = model.startsWith('gemini');
+    const apiKey = isGemini ? S.get('gemini_apikey') : S.get('apikey');
+    
+    if (!apiKey) throw new Error(`${isGemini ? 'Gemini' : 'OpenAI'}のAPIキーが未設定です。`);
+
+    let url, headers, body;
+    if (isGemini) {
+        url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
+        headers = { 'Content-Type': 'application/json' };
+        body = JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] });
+    } else {
+        url = 'https://api.openai.com/v1/chat/completions';
+        headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
+        body = JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], stream: true });
+    }
+
+    const res = await fetch(url, { method: 'POST', headers, body });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error?.message || `HTTPエラー ${res.status}`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let fullText = '';
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n'); buf = lines.pop();
+        for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const raw = line.slice(6).trim();
+            if (raw === '[DONE]') break;
+            if (!raw) continue;
+            try {
+                const data = JSON.parse(raw);
+                const chunk = isGemini ? (data.candidates?.[0]?.content?.parts?.[0]?.text || '') : (data.choices?.[0]?.delta?.content || '');
+                fullText += chunk;
+                onChunk(chunk);
+            } catch {}
+        }
+    }
+    if (onComplete) onComplete(fullText);
+}
+
+// ==================== Generate Process ====================
+async function generateAdvice() {
+    if (!document.getElementById('golf-data').value.trim()) { alert('ショットデータを貼り付けてください。'); return; }
+
+    const resultView = document.getElementById('result-view');
+    const loading = document.getElementById('result-loading');
+    const loadingText = document.getElementById('loading-status-text');
+    const content = document.getElementById('advice-content');
+    const btnShowDiag = document.getElementById('btn-show-diagnosis');
+    const btnCopy = document.getElementById('btn-copy');
+
+    // 表示リセット
+    resultView.style.display = 'block';
+    content.textContent = '';
+    btnShowDiag.style.display = 'none';
+    btnCopy.style.display = 'none';
+    
+    loading.style.display = 'block';
+    loadingText.textContent = 'データを診断中...';
+    
+    resultView.scrollIntoView({ behavior: 'smooth' });
+
+    currentDiagnosisText = "";
+    
+    try {
+        // STEP 1: 診断のバックグラウンド実行
+        const prompt1 = buildDiagnosisPrompt();
+        await fetchAIStream(prompt1, 'diag_model', () => {}, (text) => { currentDiagnosisText = text; });
+        btnShowDiag.style.display = 'inline-block';
+
+        // STEP 2: アドバイスの実行と表示
+        const selClub = selected['club'];
+        const hasAdvRule = (ADVICE_SHARED_RULE.trim() !== '') || (selClub && selClub.clubType && ADVICE_CLUB_RULES[selClub.clubType]?.trim() !== '');
+        
+        if (!hasAdvRule) {
+            loading.style.display = 'none';
+            content.innerHTML = `<div style="text-align:center; color:var(--text-muted); font-size:12px;">アドバイス用ルールが未設定のため、アドバイスの生成はスキップされました。<br>上のボタンから診断結果を確認できます。</div>`;
+            return;
+        }
+
+        loadingText.textContent = 'アドバイスを生成中...';
+
+        const prompt2 = buildAdvicePrompt(currentDiagnosisText);
+        
+        let isFirstChunk = true;
+        await fetchAIStream(prompt2, 'adv_model', (chunk) => {
+            if (isFirstChunk) {
+                loading.style.display = 'none'; // 最初の文字が出た瞬間にローディングを消す
+                isFirstChunk = false;
+            }
+            content.textContent += chunk;
+            // 自動スクロール
+            const bottom = resultView.getBoundingClientRect().bottom;
+            if(bottom > window.innerHeight) window.scrollBy(0, 50);
+        }, () => {
+            if (isFirstChunk) loading.style.display = 'none'; // 万が一空だった時の保険
+            btnCopy.style.display = 'block';
+        });
+
+    } catch(err) { 
+        loading.style.display = 'none';
+        content.innerHTML = `<div class="error-box">❌ エラー: ${err.message}</div>`; 
+    }
+}
+
+async function copyAdvice(btn) {
+    const text = document.getElementById('advice-content')?.textContent; 
+    if (!text) return;
+    try { 
+        await navigator.clipboard.writeText(text); 
+        const o = btn.textContent; 
+        btn.textContent = '✅ コピー完了'; 
+        setTimeout(() => btn.textContent = o, 2000); 
+    } catch { alert('コピー失敗'); }
+}
+
+function loadDefaults() { 
+    TYPES.forEach(t => { 
+        const d = S.defId(t); 
+        if(d) { 
+            const p = S.presets(t).find(x => x.id === d); 
+            if(p) { selected[t] = p; updateMainRow(t, p.name, p.clubType); } 
+        } 
+    }); 
+}
+
+function init() {
+    loadDefaults();
+    if (S.get('apikey')) document.getElementById('api-key').value = S.get('apikey');
+    if (S.get('gemini_apikey')) document.getElementById('gemini-api-key').value = S.get('gemini_apikey');
+    document.getElementById('diag-model').value = S.get('diag_model') || 'gemini-2.5-flash';
+    document.getElementById('adv-model').value = S.get('adv_model') || 'gemini-2.5-flash';
+}
+
+init();
+</script>
+</body>
+</html>
