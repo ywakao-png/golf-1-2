@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AIアドバイス (キャッシュ最適化版)</title>
+    <title>AIアドバイス</title>
     <style>
         * {
             box-sizing: border-box;
@@ -124,7 +125,7 @@
             font-size: 14px;
         }
         textarea.data-textarea {
-            flex: 1;
+            width: 100%;
             background: var(--input-bg);
             border: 1px solid var(--border);
             color: white;
@@ -134,6 +135,83 @@
             font-family: inherit;
             outline: none;
         }
+        .data-entry-row {
+            margin-bottom: 8px;
+        }
+        .data-entry-header {
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+        .data-entry-label {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .btn-remove-entry {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0;
+            font-family: inherit;
+            line-height: 1;
+        }
+        .btn-remove-entry:active { opacity: 0.7; }
+        .btn-reset-entry {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0;
+            font-family: inherit;
+            line-height: 1;
+        }
+        .btn-reset-entry:active { opacity: 0.7; }
+        .shot-mode-selector {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+        .btn-shot-mode {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            padding: 6px 16px;
+            font-size: 13px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .btn-shot-mode.active {
+            background: var(--primary);
+            color: white;
+        }
+        .btn-shot-mode:active { opacity: 0.7; }
+        .btn-add-entry {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px dashed var(--border);
+            padding: 8px;
+            font-size: 13px;
+            width: 100%;
+            cursor: pointer;
+            margin-top: 4px;
+            font-family: inherit;
+            display: none;
+        }
+        .btn-add-entry:active { opacity: 0.7; }
 
         /* Disclaimer & Buttons */
         .btn-check {
@@ -149,7 +227,7 @@
         .btn-check:active { opacity: 0.7; }
         
         .disclaimer {
-            font-size: 16px;
+            font-size: 14px;
             line-height: 1.5;
             color: var(--text-muted);
             margin: 20px 0;
@@ -187,7 +265,7 @@
             line-height: 1.8;
             white-space: pre-wrap;
             word-break: break-word;
-            min-height: 20px; /* ロード中は小さくてもOK */
+            min-height: 20px;
             margin-bottom: 20px;
         }
         .btn-copy {
@@ -302,6 +380,8 @@
         <div class="setting-input" onclick="openSelectModal('club')" id="main-club"></div>
     </div>
 
+
+
     <div class="setting-row">
         <div class="setting-label">ボール</div>
         <div class="setting-input" onclick="openSelectModal('ball')" id="main-ball"></div>
@@ -319,7 +399,15 @@
 
     <div class="setting-row align-top">
         <div class="setting-label" style="padding-top: 10px;">データ</div>
-        <textarea id="golf-data" rows="6" class="data-textarea" placeholder=""></textarea>
+        <div style="flex:1;">
+            <div class="shot-mode-selector">
+                <button class="btn-shot-mode active" data-mode="1" onclick="setDataMode(1)">1</button>
+                <button class="btn-shot-mode" data-mode="3" onclick="setDataMode(3)">3</button>
+                <button class="btn-shot-mode" data-mode="multi" onclick="setDataMode('multi')">5以上</button>
+            </div>
+            <div id="data-entries-container"></div>
+            <button id="btn-add-entry" class="btn-add-entry" onclick="addDataEntry()">＋ ショット追加</button>
+        </div>
     </div>
 
     <div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
@@ -336,7 +424,6 @@
     <button class="btn-start" onclick="generateAdvice()">アドバイス開始</button>
 
     <div id="result-view" class="result-container">
-        <button class="btn-diagnosis-show" onclick="openDiagnosisModal()" id="btn-show-diagnosis">診断結果を見る</button>
         <div class="curve-line"></div>
         <div id="result-loading" class="loading-box" style="display:none;">
             <div class="spinner"></div>
@@ -391,23 +478,17 @@
     
     <div class="card">
         <div class="card-title">⚙️ AIモデル設定</div>
-        <label>🔍 診断用モデル</label>
-        <select id="diag-model">
-            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-            <option value="gpt-5-nano">GPT-5 nano</option>
-            <option value="gpt-5-mini">GPT-5 mini</option>
-            <option value="gpt-5.4-mini">GPT-5.4 mini</option>
-            <option value="gpt-5">GPT-5</option>
-            <option value="gpt-4o-mini">GPT-4o mini</option>
-        </select>
-        <label>💡 アドバイス用モデル</label>
-        <select id="adv-model">
-            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-            <option value="gpt-5-mini">GPT-5 mini</option>
+        <label>モデル</label>
+        <select id="model">
+            <option value="gpt-5-mini">GPT-5 mini（デフォルト）</option>
             <option value="gpt-5-nano">GPT-5 nano</option>
             <option value="gpt-5.4-mini">GPT-5.4 mini</option>
             <option value="gpt-5">GPT-5</option>
+            <option value="gpt-4.1-nano">GPT-4.1 nano</option>
+            <option value="gpt-4.1-mini">GPT-4.1 mini</option>
             <option value="gpt-4o">GPT-4o</option>
+            <option value="gpt-4o-mini">GPT-4o mini</option>
+            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
         </select>
         <button class="btn btn-primary btn-full" style="margin-top:16px;" onclick="saveModel()">💾 モデル設定を保存</button>
     </div>
@@ -450,245 +531,230 @@
     </div>
 </div>
 
-<div id="diagnosis-modal" class="modal-overlay" onclick="closeDiagnosisModal(event)">
-    <div class="modal">
-        <div class="modal-title">🔍 診断結果</div>
-        <div id="diagnosis-content" style="font-size: 14px; line-height: 1.8; white-space: pre-wrap; color: #ccc;"></div>
-        <button class="btn btn-secondary btn-full" style="margin-top:20px;" onclick="closeDiagnosisModal()">閉じる</button>
-    </div>
-</div>
 
 <script>
 // ============================================================================
 // 💡 AIへの指示（ハードコード領域）
 // ============================================================================
 
-const DIAGNOSIS_SHARED_RULE = `あなたはゴルフ弾道データ分析AIです。
-入力されたショットデータを分析し、飛距離ロスと方向性低下の原因を優先順に最大4つ診断してください。
-【共通ルール】
-- 必ず入力された数値のみを根拠に判断
-- 診断は問題の明確化に徹し、推測・一般論・改善提案は禁止
-- 必ず「主」「補」を確認する
-- 主は問題の発生条件（必須条件）、補は問題が実際に起きているかを示す補助条件
-- 主のみでは診断しない
-- 補が1つ以上確認できる場合のみ診断
-- 同一カテゴリの重複出力は禁止
-- 原因と結果が重なる場合は根本原因を優先
-- 明確な原因が4つ未満の場合は無理に出さない
-- 総飛距離 / キャリー / ラン / 高さ / 左右ブレ幅は[yds]、ボールスピード / クラブスピードは[m/s]、滞空時間は[s]、AOA / スピンロフト / スピン軸 / 打ち出し方向 / 打ち出し角は[°]、スピン量は[rpm]
-- 捕捉には主のデータを含めない
-- 捕捉は問題として最も考えられるデータを1〜最大5つまで表示
-- 目標には主条件に対応する基準レンジのみを記載
-- 目標は単一値ではなくレンジで記載
-【診断カテゴリ】※診断は以下のカテゴリ名で出力
-- 入射の問題（クラブの入り方）
-- 当たり方の問題（インパクト効率）
-- 出球方向の問題（スタート方向）
-- 曲がりの問題（サイドスピン）
-- 安定性の問題（ばらつき）
-【共通優先順位】
-- 入射の問題 ＞ 当たり方の問題 ＞ 出球方向の問題 ＞ 曲がりの問題 ＞ 安定性の問題
-- 上流原因を優先する
-- 同一カテゴリ内で複数条件が成立した場合は最も影響の大きいものを採用する
-【診断ルール（内部判定）】
-▼ 入射の問題
-- 主：AOA＜下限 または AOA＞理想未満
-補：打ち出し角異常（高または低） / 高さ異常 / 弾道効率低（高さや滞空時間の割に前進距離（キャリーまたはラン）が不足 ）
-▼ 当たり方の問題
-- 主：ミート率＜基準未満 / スピンロフト＞基準超 / スピン量が適正レンジ外
-- 補：ボールスピード＜期待値90%未満 / 初速効率低（クラブスピードに比べボールスピード不足） / キャリー不足 / 総飛距離不足 / 高さ異常 
-▼ 出球方向の問題
-- 主：打ち出し方向が左右に偏る
-- 補：スピン軸が同方向に傾く / 左右ブレが同方向に偏る
-▼ 曲がりの問題
-- 主：スピン軸の絶対値が大きい
-- 補：左右ブレ幅が大きい / 曲がり傾向が明確 / 打ち出し方向と着弾のズレが大きい
-▼ 安定性の問題
-- 主：左右ブレ幅が大きい
-- 補：打ち出し方向が不安定 / スピン軸のばらつきが大きい / ショットタイプにばらつき
-【重要ルール（結果→原因変換）】
-- 打ち出し角、スピン量、高さは診断名として使用しない
-- これらは補助条件としてのみ使用する
-- 結果指標に異常がある場合、それを説明できる原因カテゴリを優先して診断する
+const SHARED_RULE = `あなたは ゴルフコーチAI です。
+ショットデータとショットの条件（プレイヤーの年齢、性別、身長、体重）をもとに、【目的】の内容を目指した、実践的で前向きな改善アドバイスを日本語で作成してください。
+【出力ルール】
+・改善できるポイントに絞る
+・提案は3つ
+・各提案は「① タイトル」＋「本文」の形式
+・複数データを見て判断
+・本文は130～160文字
+・タイトルは文字数に含めない
+【本文の構成】
+以下の3要素を自然な文章として含めること
+1. データから分かる現状や傾向を実際のデータを出して説明
+2. 具体的な改善方法
+3. 改善後に期待できる効果を文章で具体的に書く
+【データ単位ルール】
+総飛距離 / キャリー / ラン / 高さ / 左右ブレ幅は[yds]
+ボールスピード / クラブスピードは[m/s]
+滞空時間は[s]
+AOA / スピンロフト / スピン軸 / 打ち出し方向 / 打ち出し角は[°]
+スピン量は[rpm]
+ショットタイプ / ミート率は単位なし
+【用語ルール】
+・同じデータを主根拠として繰り返し使わない
+・データは問題に大きくつながっている2～3のみ表示
+・データ提示だけでなく「何が起きているか」を一言で説明する
+・スピン量を見る場合は、スピン軸、左右ブレ幅、打ち出し方向、打ち出し角など他データと合わせて判断する
+■ 改善方法
+・分かり易い言葉（初心者〜中級者でもその場で真似できる表現）を用いる
+・必ず「実際の動き」で説明すること
+・体/位置/向き/感覚で説明
+・道具名や理論名だけで改善方法を説明しないこと
+・1つの提案につき改善動作は1つだけに絞り、複数同時に指示しない
+・「しっかり振る」「意識する」「安定させる」だけの抽象的な改善方法は禁止
+・可能な場合は、2〜3cm、ボール半個分、少し右を向ける、胸を目標へ向ける、など具体的な量や向きで説明する
+・「フェース管理」「タメを作る」「プレーンを整える」など、専門用語だけで説明しない
+・複数ショットの場合は、ばらつきや傾向を示すデータを優先する
+・ばらつきが大きい場合は安定性を優先する
+・文章では複数ショットとして自然に表現する
+【効果の書き方】
+・改善後に期待できる効果は、数値化しなくてもよい
+・ただし「安定します」「良くなります」だけで終わらせない
+・例：曲がり幅が穏やかになり、狙った方向へ出しやすくなる
+・例：打ち出しが高くなり、キャリーが伸びて総飛距離アップにつながる
+【改善の優先順位】
+・曲がりや左右ブレの問題は、まずフェースの向き、手首の返りすぎ、インパクト時の体の動きで改善する
+・足の向きや肩の向きだけを変えて、曲がりを直そうとしない
+・ボール位置は、曲がりや左右ブレを直すための主な改善方法にしない
+【文体・トーン】
+・コーチがプレイヤーに話しかけるような自然で丁寧な日本語の会話文で書く
+・説明的になりすぎず、アドバイスとして自然な流れにする
+・断定しすぎず、押し付けない表現にする
+・前向きで一緒に改善する姿勢
+・1文を短くし、情報を詰め込みすぎない
+・不要な補足説明（例：まずは〜、無理に〜）は書かない
+【文章の流れ】
+・最初にデータから分かる状況を会話的に伝える
+・次に改善動作を「〜してみてください」と提案する
+・最後は「〜なります」「〜しやすくなります」で簡潔に締める
+【禁止】
+・練習回数や球数の指示
+・データにない仮定
 【出力形式】
-- 1. カテゴリ名（原因）
-- 捕捉：補助データ
-- 目標：主データの基準レンジ
-【出力例】
-1. 入射の問題（AOA過多-10.92°）
-捕捉：打ち出し角 28.6° / 滞空時間 5.4s
-目標：AOA +2〜+5°`;
+① タイトル
+本文
+② タイトル
+本文
+③ タイトル
+本文`;
 
-const DIAGNOSIS_CLUB_RULES = {
-    "ドライバー": `【ドライバー基準レンジ】
-- クラブスピード区分：30以上35未満=低速、35以上40未満=中速、40以上46以下=高速
-- スピン量：低速2500〜3200 / 中速2200〜3000 / 高速1800〜2600
-- 打ち出し角：低速12〜16 / 中速11〜15 / 高速10〜14
-- ミート率：1.45以上理想、1.40以上1.45未満許容、1.40未満問題候補
-- AOA：+2〜+5理想、0〜+2やや不足、-2〜0不足、-2未満 過度なダウンブロー 
-- 高さ：20〜35理想、35超40未満やや高い、40以上高い、15以上20未満やや低い、15未満低い
-- ボールスピード期待値：クラブスピード×1.45
-- スピンロフト：15.6前後中心、18超やや過多候補、20超過多候補`,
-    "フェアウェイウッド": `【フェアウェイウッド基準レンジ】
-- クラブスピード区分：28以上33未満=低速、33以上38未満=中速、38以上43以下=高速
-- スピン量：低速3200〜4200 / 中速3000〜4000 / 高速2800〜3800
-- 打ち出し角：低速11〜15 / 中速10〜14 / 高速9〜13
-- ミート率：1.43以上理想、1.38以上1.43未満許容、1.38未満問題候補
-- AOA：-3〜0理想、0超やや不足、-5未満 過度なダウンブロー 
-- 高さ：18〜32理想、32超高い、15未満低い
-- ボールスピード期待値：クラブスピード×1.43
-- スピンロフト：17前後中心、20超やや過多候補、22超過多候補`,
-    "ユーティリティ": `【ユーティリティ基準レンジ】
-- クラブスピード区分：26以上31未満=低速、31以上36未満=中速、36以上41以下=高速
-- スピン量：低速3400〜4600 / 中速3200〜4400 / 高速3000〜4200
-- 打ち出し角：低速13〜18 / 中速12〜17 / 高速11〜16
-- ミート率：1.42以上理想、1.36以上1.42未満許容、1.36未満問題候補
-- AOA：-4〜-1理想、0超やや不足、-6未満 過度なダウンブロー 
-- 高さ：20〜34理想、34超高い、16未満低い
-- ボールスピード期待値：クラブスピード×1.42
-- スピンロフト：19前後中心、22超やや過多候補、24超過多候補`,
-    "アイアン": `【アイアン基準レンジ】
-- クラブスピード区分：24以上29未満=低速、29以上34未満=中速、34以上39以下=高速
-- スピン量：低速4500〜6500 / 中速5000〜7000 / 高速5500〜7500
-- 打ち出し角：低速16〜22 / 中速15〜21 / 高速14〜20
-- ミート率：1.38以上理想、1.32以上1.38未満許容、1.32未満問題候補
-- AOA：-5〜-2理想、-2超やや不足、-7未満 過度なダウンブロー 
-- 高さ：22〜36理想、36超高い、18未満低い
-- ボールスピード期待値：クラブスピード×1.38
-- スピンロフト：24前後中心、28超やや過多候補、30超過多候補`,
-    "ウェッジ": `【ウェッジ基準レンジ】
-- クラブスピード区分：18以上23未満=低速、23以上28未満=中速、28以上33以下=高速
-- スピン量：低速5000〜7500 / 中速6000〜8500 / 高速7000〜9500
-- 打ち出し角：低速24〜32 / 中速22〜30 / 高速20〜28
-- ミート率：1.25以上理想、1.20以上1.25未満許容、1.20未満問題候補
-- AOA：-6〜-3理想、-3超やや不足、-8未満 過度なダウンブロー 
-- 高さ：20〜32理想、32超高い、16未満低い
-- ボールスピード期待値：クラブスピード×1.25
-- スピンロフト：30前後中心、34超やや過多候補、36超過多候補`,
-    "その他": `【その他基準レンジ】
-- 特定クラブの理想レンジは直接適用しない
-- クラブスピード、ボールスピード、打ち出し角、スピン量、ミート率、左右ブレ幅、スピン軸の関係性を優先して判断
-- ボールスピード期待値はクラブスピード×1.35〜1.45の範囲を目安にする
-- AOA、スピンロフトは極端な値のみ候補化する`
+const CLUB_RULES = {
+    "ドライバー": `【目的】
+飛距離を最大化しつつ、ボールをできるだけまっすぐ安定して飛ばすためのプロフィールをもとにした「実行できる改善行動」を提示`,
+    "フェアウェイウッド": `【目的】
+飛距離を最大化しつつ、ボールをできるだけまっすぐ安定して飛ばすためのプロフィールをもとにした「実行できる改善行動」を提示`,
+    "ユーティリティ": `【目的】
+飛距離を最大化しつつ、ボールをできるだけまっすぐ安定して飛ばすためのプロフィールをもとにした「実行できる改善行動」を提示`,
+    "アイアン": `【目的】
+飛距離を最大化しつつ、ボールをできるだけまっすぐ安定して飛ばすためのプロフィールをもとにした「実行できる改善行動」を提示`,
+    "ウェッジ": `【目的】
+クラブスピードに合った距離が左右にぶれる事無く正確に打てるためのプロフィールをもとにした「実行できる改善行動」を提示`,
+    "その他": `【目的】
+ショットデータから分かる範囲で、方向安定とミート率改善を中心にしたプロフィールをもとにした汎用的な改善を行う
+【クラブ不明時ルール】
+・クラブの種類を推定してはいけない
+・飛距離最大化などクラブ依存の最適化は行わない
+・方向安定とミート率改善を優先する
+・極端な調整（ティー高さ、ボール位置の大幅変更など）は行わない`
 };
 
-const ADVICE_SHARED_RULE = `あなたはゴルフ改善アドバイスAIです。
-入力された問題点に対して、一般ゴルファーが実行できる改善方法を作成してください。
-【共通ルール】
-- 各問題点は、実行可能な改善方法を1行で出力
-- 1行は簡潔にし、90文字以内で作成
-- 必ず「何をするか」と「何が改善されるか」を含める
-- 抽象表現、精神論、原因分析、数値の再説明は禁止
-- 入力にない新たな問題点を追加しない
-- 同じ内容の繰り返しは禁止
-- クラブ特性を考慮し、クラブに合わないアドバイスは禁止
-- 危険な矯正、極端なフォーム変更、医学的助言は禁止
-【作成原則】
-- 動作は、セットアップ、ボール位置、フェース向き、振り方、力感、テンポ、体の使い方のいずれかに落とし込む
-- 改善結果は、飛距離、キャリー、高さ、スピン量、方向性、左右ブレ、ミート率、初速のいずれかに結びつける
-- 問題点ごとに単独で読んで意味が通る内容にする
-- 丁寧で敬語を使用した自然な日本語
-- 目標（データ名と目標値）をタイトルの次に表示
-- 複数の問題がある場合、上位の問題に主要な改善動作を割り当て、下位の問題はそれと矛盾しない補助的な表現を使う
-【操作カテゴリルール】
-- 改善方法は、操作カテゴリごとに矛盾しない内容にする
-- 同じ問題点群に対して逆方向の指示を出してはならない
-- ボール位置、フェース向き、入射、体の動き、テンポ、力感、当たり方のいずれかで改善内容を示す
-- 改善対象が結果指標ではなく、操作可能な要素になるように書く
-- 打ち出し角、スピン量、高さなどの結果そのものを直接操作対象として書かない
-- 入力された問題が複数ある場合でも、各行は独立して成立しつつ、他の行と矛盾しない内 
-【問題点ごとの改善方針】
-▼ 入射の問題
-- クラブの入り方を整える方向で書く
-- ボール位置、入射の深さ、胸や体の向き、振り抜き方を使って表現する
-- 打ち込みすぎや、逆に入射が足りない状態を改善する方向で書く
-- 改善結果は、キャリー、高さ、ラン、飛距離効率の改善につなげる
-▼ 当たり方の問題
-- 芯に当てやすくする、ロフトを増やしすぎない、インパクト効率を高める方向で書く
-- ハンドファースト、力感、振り幅、当たり方、フェースに乗せる感覚などで表現する
-- 改善結果は、初速、飛距離、スピン量、キャリー、距離の安定につなげる
-▼ 出球方向の問題
-- 構え、フェース向き、体の向き、アドレスの方向を整える方向で書く
-- 出球を左または右へ出しすぎないよう修正する内容にする
-- 改善結果は、スタート方向の安定、狙い方向への出球改善につなげる
-▼ 曲がりの問題
-- 手打ち抑制、体の回転、フェース管理を中心に書く
-- 曲がり幅を減らす方向で書く
-- 改善結果は、方向性改善、左右の曲がり縮小につなげる
-▼ 安定性の問題
-- テンポ、再現性、インパクト安定を中心に書く
-- 同じ動きの再現と散らばり縮小を狙う内容にする
-- 改善結果は、左右ブレの縮小、方向性の安定、ショットの再現性向上につなげる
-【プロフィール反映ルール】
-- 性別や年齢によって診断名や問題点、分析結果を変更してはならない
-- 性別と年齢は改善方法の内容、優先の置き方、表現の強さのみ反映
-- 性別は、飛距離・高さ・安定性のどれを優先して改善するかの比重調整に使う
-- 年齢は、無理のない動作量、体への負担、再現しやすさを考慮して改善方法を調整する
-- 年齢が高い場合は、極端なフォーム変更よりも、セットアップ、テンポ、力感、ボール位置などの調整を優先する
-- 若年層には、体の使い方を含む改善提案をしてよい
-- 性別や年齢を理由に改善を弱めるのではなく、その人に合った実行しやすい改善に言い換える
-- 性別や年齢そのものの出力文明示禁止
-【出力形式】
-タイトル（目標） | 改善方法 + 改善される内容`;
-
-const ADVICE_CLUB_RULES = {
-    "ドライバー": `【クラブ特性（ドライバー）】
-- 飛距離効率（キャリー＋ラン）を最優先で考える
-- スピン量と打ち出し角のバランス改善を優先する
-- AOAは重要指標として扱う
-- ミート率と初速効率を重視する
-- 左右ブレとスピン軸の改善を重視する
-- ティーアップ前提のアドバイスを含めてよい`,
-    "フェアウェイウッド": `【クラブ特性（フェアウェイウッド）】
-- キャリー性能を最優先で考える
-- 打ち出し角と高さの確保を重視する
-- ミート率と初速効率を重視する
-- スピン量は球の上がりやすさに影響する前提で扱う
-- 方向性改善も評価対象とする
-- 地面から打つ前提のアドバイスを優先する`,
-    "ユーティリティ": `【クラブ特性（ユーティリティ）】
-- 高さとキャリーを最優先で考える
-- スピン量は球の浮きやすさに影響する前提で扱う
-- ミート率と初速効率を重視する
-- 方向性の安定を重視する
-- アイアンより払い打ち寄りのアドバイスを優先する`,
-    "アイアン": `【クラブ特性（アイアン）】
-- キャリーと距離の安定性を最優先で考える
-- 打ち出し方向を重視する
-- 高さとスピン量を評価する
-- ミート率と初速効率を重視する
-- ドライバー的なアッパー軌道の助言は禁止`,
-    "ウェッジ": `【クラブ特性（ウェッジ）】
-- キャリーの再現性を最優先で考える
-- スピン量を重要指標とする
-- 高さを評価する
-- 方向性の安定を重視する
-- 強振ではなく距離感を整える方向の助言を優先する`,
-    "その他": `【クラブ特性（その他）】
-- ミート率とボール初速の効率を重視する
-- 打ち出し方向と左右ブレを評価する
-- スピン量と打ち出し角のバランスを確認する
-- 極端なクラブ専用助言は避ける`
-};
+const SHOT_RULE_1 = ``;
+const MULTI_SHOT_RULE_3 = `【ショット数ルール】
+・3球分のデータとして扱う
+・2球以上に共通する問題を優先する
+・1球だけ大きく外れた数値を主根拠にしない
+・平均だけでなく、左右ブレ幅、打ち出し方向、ミート率、キャリーのばらつきも見る
+・傾向は「3球を見ると」「複数ショットで」など自然に表現する`;
+const MULTI_SHOT_RULE_5 = `【ショット数ルール】
+・5〜20球分のデータとして扱う
+・単発の良いショットや悪いショットではなく、全体の平均とばらつきで判断する
+・安定して出ている問題を優先して改善対象にする
+・左右ブレ幅、打ち出し方向、キャリー、ミート率のばらつきが大きい場合は安定性を優先する
+・平均が良くてもばらつきが大きい場合は、飛距離アップより再現性の改善を優先する
+・傾向は「全体を見ると」「複数ショットでは」など自然に表現する`;
 
 const CHECK_ITEMS = [
-    "総飛距離", "キャリー", "ラン", "ボールスピード",
-    "クラブスピード", "ミート率", "高さ", "滞空時間",
-    "打ち出し角", "AOA", "スピンロフト", "スピン量",
-    "スピン軸", "左右ブレ幅", "打ち出し方向", "ショットタイプ"
+    "総飛距離", "キャリー", "ラン", "クラブスピード",
+    "ボールスピード", "ミート率", "高さ", "打ち出し角",
+    "滞空時間", "AOA", "スピンロフト", "スピン軸",
+    "スピン量", "打ち出し方向", "左右ブレ幅", "ショットタイプ"
 ];
 
-// クラブの略称マッピング
 const CLUB_TYPE_MAP = {
     "ドライバー": "DR",
     "フェアウェイウッド": "FW",
     "ユーティリティ": "UT",
     "アイアン": "I",
     "ウェッジ": "WG",
-    "その他": "---" // 画像の仕様や好みで変えてOK
+    "その他": "PT"
 };
 // ============================================================================
 
+
+// ==================== Data Entries ====================
+let dataEntryNextId = 1;
+let dataMode = 1; // 1, 3, 'multi'
+
+function createDataEntry() {
+    const id = dataEntryNextId++;
+    const div = document.createElement('div');
+    div.className = 'data-entry-row';
+    div.dataset.entryId = id;
+    div.innerHTML = `
+        <div class="data-entry-header">
+            <span class="data-entry-label"></span>
+            <div style="display:flex;gap:4px;">
+                <button class="btn-reset-entry" onclick="resetDataEntry(this)" title="入力内容をクリア">↺</button>
+                <button class="btn-remove-entry" onclick="removeDataEntry(this)">×</button>
+            </div>
+        </div>
+        <textarea rows="6" class="data-textarea" placeholder=""></textarea>
+    `;
+    return div;
+}
+
+function setDataMode(mode) {
+    dataMode = mode;
+    document.querySelectorAll('.btn-shot-mode').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode == mode);
+    });
+    const target = (mode === 'multi') ? 5 : mode;
+    const container = document.getElementById('data-entries-container');
+    const current = getDataEntryRows().length;
+    if (current < target) {
+        for (let i = current; i < target; i++) container.appendChild(createDataEntry());
+    } else if (current > target) {
+        const all = Array.from(getDataEntryRows());
+        for (let i = current - 1; i >= target; i--) all[i].remove();
+    }
+    updateDataEntryDisplay();
+}
+
+function addDataEntry() {
+    if (dataMode !== 'multi') return;
+    if (getDataEntryRows().length >= 20) return;
+    document.getElementById('data-entries-container').appendChild(createDataEntry());
+    updateDataEntryDisplay();
+}
+
+function removeDataEntry(btn) {
+    if (getDataEntryRows().length <= 5) return;
+    btn.closest('.data-entry-row').remove();
+    updateDataEntryDisplay();
+}
+
+function resetDataEntry(btn) {
+    const ta = btn.closest('.data-entry-row').querySelector('textarea');
+    if (ta) ta.value = '';
+}
+
+function getDataEntryRows() {
+    return document.querySelectorAll('#data-entries-container .data-entry-row');
+}
+
+function updateDataEntryDisplay() {
+    const rows = getDataEntryRows();
+    const count = rows.length;
+    const isMulti = dataMode === 'multi';
+    rows.forEach((row, i) => {
+        const header = row.querySelector('.data-entry-header');
+        const label = row.querySelector('.data-entry-label');
+        const removeBtn = row.querySelector('.btn-remove-entry');
+        if (header) header.style.display = 'flex';
+        if (label) label.textContent = count > 1 ? ('ショット' + (i + 1)) : '';
+        if (removeBtn) removeBtn.style.display = (isMulti && count > 5) ? 'flex' : 'none';
+    });
+    const addBtn = document.getElementById('btn-add-entry');
+    if (addBtn) addBtn.style.display = (isMulti && count < 20) ? 'block' : 'none';
+}
+
+function getAllDataText() {
+    const rows = getDataEntryRows();
+    const entries = [];
+    rows.forEach(row => {
+        const ta = row.querySelector('textarea');
+        if (ta && ta.value.trim()) entries.push(ta.value.trim());
+    });
+    if (entries.length === 0) return '';
+    if (entries.length === 1) return entries[0];
+    return entries.map((e, i) => `[ショット${i + 1}]\n${e}`).join('\n\n');
+}
+
+function hasAnyData() {
+    const rows = getDataEntryRows();
+    return Array.from(rows).some(row => {
+        const ta = row.querySelector('textarea');
+        return ta && ta.value.trim();
+    });
+}
 
 // ==================== Storage ====================
 const S = {
@@ -707,7 +773,6 @@ let selectModalType = null;
 let editModalType = null;
 let editModalId = null;
 let editGender = '男性';
-let currentDiagnosisText = "";
 
 // ==================== Nav & Accordion ====================
 function showPage(page, el) {
@@ -726,7 +791,7 @@ function toggleAcc(btn) {
 // ==================== Check Data Modal ====================
 function openDataCheckModal() {
     const listEl = document.getElementById('checklist');
-    const text = document.getElementById('golf-data').value;
+    const text = getAllDataText();
     let foundCount = 0;
     
     listEl.innerHTML = CHECK_ITEMS.map(item => {
@@ -746,17 +811,6 @@ function openDataCheckModal() {
 function closeDataCheckModal(e) {
     if (e && e.target !== document.getElementById('data-check-modal')) return;
     document.getElementById('data-check-modal').classList.remove('active');
-}
-
-// ==================== Diagnosis Modal ====================
-function openDiagnosisModal() {
-    document.getElementById('diagnosis-content').textContent = currentDiagnosisText || "診断結果がありません。";
-    document.getElementById('diagnosis-modal').classList.add('active');
-}
-
-function closeDiagnosisModal(e) {
-    if (e && e.target !== document.getElementById('diagnosis-modal')) return;
-    document.getElementById('diagnosis-modal').classList.remove('active');
 }
 
 // ==================== Main: Select Modal ====================
@@ -822,6 +876,7 @@ function updateMainRow(type, name, clubType) {
     if (type === 'club') {
         const typeBox = document.getElementById('main-club-type');
         typeBox.textContent = clubType ? (CLUB_TYPE_MAP[clubType] || "---") : "---";
+
     }
 }
 
@@ -910,6 +965,7 @@ function buildEditForm(type, preset) {
         `;
     }
     if (type === 'club') {
+        const isWedge = v('clubType') === 'ウェッジ';
         return `
             <label>クラブ名</label><input type="text" id="ef-name" value="${v('name')}" placeholder="例：TaylorMade Stealth 2">
             <label>クラブの種類</label>
@@ -921,6 +977,7 @@ function buildEditForm(type, preset) {
                 <option value="ウェッジ" ${v('clubType') === 'ウェッジ' ? 'selected' : ''}>ウェッジ</option>
                 <option value="その他" ${v('clubType') === 'その他' ? 'selected' : ''}>その他</option>
             </select>
+
         `;
     }
     if (type === 'ball') {
@@ -940,6 +997,8 @@ function buildEditForm(type, preset) {
         `;
     }
 }
+
+
 
 function setEditGender(g, btn) {
     editGender = g;
@@ -1007,10 +1066,9 @@ function saveApiKey() {
     alert('APIキーを保存しました'); 
 }
 
-function saveModel() { 
-    S.set('diag_model', document.getElementById('diag-model').value);
-    S.set('adv_model', document.getElementById('adv-model').value);
-    alert('モデル設定を保存しました'); 
+function saveModel() {
+    S.set('model', document.getElementById('model').value);
+    alert('モデル設定を保存しました');
 }
 
 // ==================== Prompt Builders ====================
@@ -1031,37 +1089,31 @@ function formatWeather() {
     return t + '\n';
 }
 
-function buildDiagnosisPrompt() {
+function buildPrompt() {
     const selClub = selected['club'];
     let p = "";
-    if (DIAGNOSIS_SHARED_RULE.trim()) p += `[共有ルール]\n${DIAGNOSIS_SHARED_RULE.trim()}\n\n`;
-    if (selClub && selClub.clubType && DIAGNOSIS_CLUB_RULES[selClub.clubType]?.trim()) {
-        p += `[クラブルール]\n${DIAGNOSIS_CLUB_RULES[selClub.clubType].trim()}\n\n`;
+    if (SHARED_RULE.trim()) p += `[共有ルール]\n${SHARED_RULE.trim()}\n\n`;
+    if (selClub && selClub.clubType && CLUB_RULES[selClub.clubType]?.trim()) {
+        p += `[クラブルール]\n${CLUB_RULES[selClub.clubType].trim()}\n\n`;
     }
+    if (dataMode === 1 && SHOT_RULE_1.trim()) p += `${SHOT_RULE_1.trim()}\n\n`;
+    if (dataMode === 3 && MULTI_SHOT_RULE_3.trim()) p += `${MULTI_SHOT_RULE_3.trim()}\n\n`;
+    if (dataMode === 'multi' && MULTI_SHOT_RULE_5.trim()) p += `${MULTI_SHOT_RULE_5.trim()}\n\n`;
     p += formatProfile();
-    if (selClub) p += `[使用クラブ]\n${selClub.name}\n\n`;
+    if (selClub) {
+        p += `[使用クラブ]\n${selClub.name}\n`;
+
+        p += '\n';
+    }
     if (selected['ball']) p += `[使用ボール]\n${selected['ball'].name}\n\n`;
     p += formatWeather();
-    p += `[ショットデータ]\n${document.getElementById('golf-data').value.trim()}\n`;
-    return p;
-}
-
-function buildAdvicePrompt(diagText) {
-    const selClub = selected['club'];
-    let p = "";
-    if (ADVICE_SHARED_RULE.trim()) p += `[共有ルール]\n${ADVICE_SHARED_RULE.trim()}\n\n`;
-    if (selClub && selClub.clubType && ADVICE_CLUB_RULES[selClub.clubType]?.trim()) {
-        p += `[クラブルール]\n${ADVICE_CLUB_RULES[selClub.clubType].trim()}\n\n`;
-    }
-    p += formatProfile();
-    p += formatWeather();
-    p += `[診断結果]\n${diagText}\n`;
+    p += `[ショットデータ]\n${getAllDataText()}\n`;
     return p;
 }
 
 // ==================== API Stream Logic ====================
-async function fetchAIStream(prompt, modelType, onChunk, onComplete) {
-    const model = S.get(modelType) || (modelType === 'diag_model' ? 'gemini-2.5-flash' : 'gpt-5-mini');
+async function fetchAIStream(prompt, onChunk, onComplete) {
+    const model = S.get('model') || 'gpt-5-mini';
     const isGemini = model.startsWith('gemini');
     const apiKey = isGemini ? S.get('gemini_apikey') : S.get('apikey');
     
@@ -1112,66 +1164,36 @@ async function fetchAIStream(prompt, modelType, onChunk, onComplete) {
 
 // ==================== Generate Process ====================
 async function generateAdvice() {
-    if (!document.getElementById('golf-data').value.trim()) { alert('ショットデータを貼り付けてください。'); return; }
+    if (!hasAnyData()) { alert('ショットデータを貼り付けてください。'); return; }
 
     const resultView = document.getElementById('result-view');
     const loading = document.getElementById('result-loading');
     const loadingText = document.getElementById('loading-status-text');
     const content = document.getElementById('advice-content');
-    const btnShowDiag = document.getElementById('btn-show-diagnosis');
     const btnCopy = document.getElementById('btn-copy');
 
-    // 表示リセット
     resultView.style.display = 'block';
     content.textContent = '';
-    btnShowDiag.style.display = 'none';
     btnCopy.style.display = 'none';
-    
     loading.style.display = 'block';
-    loadingText.textContent = 'データを診断中...';
-    
+    loadingText.textContent = 'AIが分析・生成中...';
     resultView.scrollIntoView({ behavior: 'smooth' });
 
-    currentDiagnosisText = "";
-    
     try {
-        // STEP 1: 診断のバックグラウンド実行
-        const prompt1 = buildDiagnosisPrompt();
-        await fetchAIStream(prompt1, 'diag_model', () => {}, (text) => { currentDiagnosisText = text; });
-        btnShowDiag.style.display = 'inline-block';
-
-        // STEP 2: アドバイスの実行と表示
-        const selClub = selected['club'];
-        const hasAdvRule = (ADVICE_SHARED_RULE.trim() !== '') || (selClub && selClub.clubType && ADVICE_CLUB_RULES[selClub.clubType]?.trim() !== '');
-        
-        if (!hasAdvRule) {
-            loading.style.display = 'none';
-            content.innerHTML = `<div style="text-align:center; color:var(--text-muted); font-size:12px;">アドバイス用ルールが未設定のため、アドバイスの生成はスキップされました。<br>上のボタンから診断結果を確認できます。</div>`;
-            return;
-        }
-
-        loadingText.textContent = 'アドバイスを生成中...';
-
-        const prompt2 = buildAdvicePrompt(currentDiagnosisText);
-        
+        const prompt = buildPrompt();
         let isFirstChunk = true;
-        await fetchAIStream(prompt2, 'adv_model', (chunk) => {
-            if (isFirstChunk) {
-                loading.style.display = 'none'; // 最初の文字が出た瞬間にローディングを消す
-                isFirstChunk = false;
-            }
+        await fetchAIStream(prompt, (chunk) => {
+            if (isFirstChunk) { loading.style.display = 'none'; isFirstChunk = false; }
             content.textContent += chunk;
-            // 自動スクロール
             const bottom = resultView.getBoundingClientRect().bottom;
-            if(bottom > window.innerHeight) window.scrollBy(0, 50);
+            if (bottom > window.innerHeight) window.scrollBy(0, 50);
         }, () => {
-            if (isFirstChunk) loading.style.display = 'none'; // 万が一空だった時の保険
+            if (isFirstChunk) loading.style.display = 'none';
             btnCopy.style.display = 'block';
         });
-
-    } catch(err) { 
+    } catch(err) {
         loading.style.display = 'none';
-        content.innerHTML = `<div class="error-box">❌ エラー: ${err.message}</div>`; 
+        content.innerHTML = `<div class="error-box">❌ エラー: ${err.message}</div>`;
     }
 }
 
@@ -1197,11 +1219,11 @@ function loadDefaults() {
 }
 
 function init() {
+    setDataMode(1);
     loadDefaults();
     if (S.get('apikey')) document.getElementById('api-key').value = S.get('apikey');
     if (S.get('gemini_apikey')) document.getElementById('gemini-api-key').value = S.get('gemini_apikey');
-    document.getElementById('diag-model').value = S.get('diag_model') || 'gemini-2.5-flash';
-    document.getElementById('adv-model').value = S.get('adv_model') || 'gemini-2.5-flash';
+    document.getElementById('model').value = S.get('model') || 'gpt-5-mini';
 }
 
 init();
